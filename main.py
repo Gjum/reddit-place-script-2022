@@ -302,18 +302,13 @@ class PlaceClient:
 
         return new_img
 
-    def get_unset_pixel(self, x, y, index):
-        originalX = x
-        originalY = y
-        loopedOnce = False
+    def get_unset_pixel(self, prev_x, prev_y, index):
+        points = []
         imgOutdated = True
         wasWaiting = False
 
         while True:
             if self.waiting_thread_index != -1 and self.waiting_thread_index != index:
-                x = originalX
-                y = originalY
-                loopedOnce = False
                 imgOutdated = True
                 wasWaiting = True
                 continue
@@ -323,15 +318,21 @@ class PlaceClient:
                 wasWaiting = False
                 time.sleep(index * self.delay_between_launches)
 
-            if x >= self.image_size[0]:
-                y += 1
-                x = 0
+            if imgOutdated:
+                boardimg = self.get_board(self.access_tokens[index])
+                pix2 = boardimg.convert("RGB").load()
+                imgOutdated = False
 
-            if y >= self.image_size[1]:
+            for y in range(0, self.image_size[1]):
+                for x in range(0, self.image_size[0]):
 
-                y = 0
+                    target_rgb = self.pix[x, y]
 
-            if x == originalX and y == originalY and loopedOnce:
+                    new_rgb = ColorMapper.closest_color(target_rgb, self.rgb_colors_array)
+                    if pix2[x + self.pixel_x_start, y + self.pixel_y_start] != new_rgb:
+                        points.append((x, y, new_rgb))
+
+            if len(points) == 0:
                 logger.info(
                     "Thread #{} : All pixels correct, trying again in 10 seconds... ",
                     index,
@@ -340,47 +341,9 @@ class PlaceClient:
                 time.sleep(10)
                 imgOutdated = True
 
-            if imgOutdated:
-                boardimg = self.get_board(self.access_tokens[index])
-                pix2 = boardimg.convert("RGB").load()
-                imgOutdated = False
+            else:
+                return random.choice(points)
 
-            logger.debug("{}, {}", x + self.pixel_x_start, y + self.pixel_y_start)
-            logger.debug(
-                "{}, {}, boardimg, {}, {}", x, y, self.image_size[0], self.image_size[1]
-            )
-
-            target_rgb = self.pix[x, y]
-
-            new_rgb = ColorMapper.closest_color(target_rgb, self.rgb_colors_array)
-            if pix2[x + self.pixel_x_start, y + self.pixel_y_start] != new_rgb:
-                logger.debug(
-                    "{}, {}, {}, {}",
-                    pix2[x + self.pixel_x_start, y + self.pixel_y_start],
-                    new_rgb,
-                    target_rgb[:3] != (69, 42, 0) and new_rgb != (69, 42, 0),
-                    pix2[x, y] != new_rgb,
-                )
-
-                if target_rgb[:3] != (69, 42, 0) and new_rgb != (69, 42, 0):
-                    logger.debug(
-                        "Thread #{} : Replacing {} pixel at: {},{} with {} color",
-                        index,
-                        pix2[x + self.pixel_x_start, y + self.pixel_y_start],
-                        x + self.pixel_x_start,
-                        y + self.pixel_y_start,
-                        new_rgb,
-                    )
-                    break
-                else:
-                    logger.info(
-                        "Transparent Pixel at {}, {} skipped",
-                        x + self.pixel_x_start,
-                        y + self.pixel_y_start,
-                    )
-            x += 1
-            loopedOnce = True
-        return x, y, new_rgb
 
     # Draw the input image
     def task(self, index, name, worker):
