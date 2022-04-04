@@ -56,30 +56,6 @@ def Init(self):
         else 9051
     )
 
-    # tor connection
-    if self.using_tor:
-        self.proxies = get_proxies(self, ["127.0.0.1:" + str(self.tor_port)])
-        if self.use_builtin_tor:
-            subprocess.Popen(
-                '"'
-                + os.path.join(os.getcwd(), "./tor/Tor/tor.exe")
-                + '"'
-                + " --defaults-torrc "
-                + '"'
-                + os.path.join(os.getcwd(), "./Tor/Tor/torrc")
-                + '"'
-                + " --HTTPTunnelPort "
-                + str(self.tor_port),
-                shell=True,
-            )
-        try:
-            self.tor_controller = Controller.from_port(port=self.tor_control_port)
-            self.tor_controller.authenticate(self.tor_password)
-            self.logger.info("successfully connected to tor!")
-        except (ValueError, SocketError):
-            self.logger.error("connection to tor failed, disabling tor")
-            self.using_tor = False
-
 
 def get_proxies_text(self):
     path_proxies = os.path.join(os.getcwd(), "proxies.txt")
